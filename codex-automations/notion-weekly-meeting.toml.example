@@ -1,0 +1,11 @@
+version = 1
+id = "notion-2"
+kind = "cron"
+name = "Notion Weekly Ops Meeting 복사"
+prompt = "This automation is paused because the reliable production path is the local launchd job `com.example.notion-weekly-meeting`, which runs `node jobs/weekly-meeting-copy/index.mjs --apply` every Monday at 10:00 KST with normal local network access. Keep this record for visibility only; do not run it while launchd is active to avoid duplicate Notion meeting pages."
+status = "PAUSED"
+rrule = "FREQ=WEEKLY;BYDAY=MO;BYHOUR=10;BYMINUTE=0;BYSECOND=0"
+model = "gpt-5.3-codex"
+reasoning_effort = "low"
+execution_environment = "local"
+cwds = ["/path/to/notion-slack-automation"]

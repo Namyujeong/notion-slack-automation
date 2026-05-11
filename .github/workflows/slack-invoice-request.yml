@@ -1,0 +1,98 @@
+name: Slack invoice request
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run mode"
+        required: true
+        default: "dry-run"
+        type: choice
+        options:
+          - dry-run
+          - apply
+
+permissions:
+  contents: write
+
+concurrency:
+  group: slack-invoice-request
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TZ: Asia/Seoul
+      RUN_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'apply' }}
+      SLACK_BOT_TOKEN: ${{ secrets.INVOICE_SLACK_BOT_TOKEN }}
+      INVOICE_SLACK_CHANNEL_ID: ${{ vars.INVOICE_SLACK_CHANNEL_ID }}
+      INVOICE_REQUEST_TARGETS_JSON: ${{ secrets.INVOICE_REQUEST_TARGETS_JSON }}
+      INVOICE_REQUEST_DAY: "10"
+      INVOICE_REQUEST_HOUR: "10"
+      INVOICE_SAME_DAY_FIRST_REMINDER_HOUR: "15"
+      INVOICE_SAME_DAY_SECOND_REMINDER_HOUR: "18"
+      INVOICE_PRE_DEADLINE_REMINDER_HOUR: "10"
+      INVOICE_DEADLINE_BUSINESS_DAYS: "3"
+      INVOICE_SKIP_KR_HOLIDAYS: "1"
+      INVOICE_INCLUDE_QUARTER_CATCHUP: "1"
+      INVOICE_REMINDERS_ENABLED: "1"
+      INVOICE_COMPLETE_REACTION_NAME: white_check_mark
+      INVOICE_DRY_RUN_CHECK_THREADS: "0"
+      INVOICE_STATE_FILE: state/slack-invoice-request-state.json
+      SLACK_FAILURE_WEBHOOK_URL: ${{ secrets.INVOICE_FAILURE_WEBHOOK_URL || secrets.SLACK_FAILURE_WEBHOOK_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate config
+        run: npm run validate:config -- invoice-request
+
+      - name: Check Slack jobs
+        run: npm run check:slack
+
+      - name: Run invoice request
+        run: |
+          mkdir -p state
+          if [ "$RUN_MODE" = "dry-run" ]; then
+            npm run dry-run:invoice
+          else
+            npm run run:invoice
+          fi
+
+      - name: Commit state
+        if: env.RUN_MODE == 'apply'
+        run: |
+          if [ -z "$(git status --porcelain -- state)" ]; then
+            echo "No state changes."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state
+          git commit -m "Update invoice request state [skip ci]"
+
+          for attempt in 1 2 3; do
+            git pull --rebase origin "$GITHUB_REF_NAME"
+            if git push; then
+              exit 0
+            fi
+            sleep 5
+          done
+
+          echo "Failed to push state changes."
+          exit 1
+
+      - name: Notify failure
+        if: failure()
+        env:
+          AUTOMATION_NAME: Slack invoice request
+        run: node scripts/notify-workflow-failure.mjs

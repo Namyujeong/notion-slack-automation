@@ -1,0 +1,45 @@
+name: Korean holiday fallback audit
+
+on:
+  schedule:
+    - cron: "0 0 2 1 *"
+  workflow_dispatch:
+    inputs:
+      year:
+        description: "Audit year. Leave blank to use the current KST year."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TZ: Asia/Seoul
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Check syntax
+        run: npm run check
+
+      - name: Audit Korean holiday fallback
+        env:
+          HOLIDAY_AUDIT_YEAR: ${{ github.event_name == 'workflow_dispatch' && inputs.year || '' }}
+        run: npm run audit:holidays
+
+      - name: Notify failure
+        if: failure()
+        env:
+          AUTOMATION_NAME: Korean holiday fallback audit
+          SLACK_FAILURE_WEBHOOK_URL: ${{ secrets.HOLIDAY_FAILURE_WEBHOOK_URL || secrets.SLACK_FAILURE_WEBHOOK_URL }}
+        run: node scripts/notify-workflow-failure.mjs

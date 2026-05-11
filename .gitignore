@@ -1,0 +1,15 @@
+.env.notion.local
+.env.slack.local
+.env.channel-cleanup.local
+.env.flex.local
+.env.invoice.local
+.env.google.local
+.google-service-account.local.json
+.slack-due-reminder-state.json
+.slack-flex-reminder-state.json
+.slack-flex-reaction-reminder-state.json
+.slack-invoice-request-state.json
+.slack-invoice-archive-state.json
+invoice-request-targets.local.json
+logs/
+state/*.tmp

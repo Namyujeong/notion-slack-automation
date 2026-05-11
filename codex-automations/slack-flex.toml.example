@@ -1,0 +1,11 @@
+version = 1
+id = "slack-flex"
+kind = "cron"
+name = "Slack Flex 휴가 및 결재 리액션 리마인더"
+prompt = "This automation is paused because the reliable production path is GitHub Actions. The initial Flex approval request is expected in the lead channel every Monday at 11:00 KST, and GitHub Actions runs `node jobs/flex-reaction-reminder/index.mjs --apply` at 15:00 and 18:00 KST for first and second thread reminders. Keep this record for visibility only; do not run it while GitHub Actions is active to avoid duplicate Slack thread reminders."
+status = "PAUSED"
+rrule = "FREQ=WEEKLY;BYDAY=MO;BYHOUR=15,18;BYMINUTE=0;BYSECOND=0"
+model = "gpt-5.3-codex"
+reasoning_effort = "low"
+execution_environment = "local"
+cwds = ["/path/to/notion-slack-automation"]

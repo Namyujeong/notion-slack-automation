@@ -1,0 +1,11 @@
+version = 1
+id = "slack-invoice"
+kind = "cron"
+name = "Slack 월별 인보이스 요청"
+prompt = "This automation is paused because the reliable production path is the local launchd job `com.example.invoice-request`, which runs `node jobs/invoice-request/index.mjs --apply` on weekdays at 10:00 and 15:00 KST with normal local network access. The script sends monthly invoice requests on the first Korean business day on or after the 10th and sends deadline reminders from local state. Keep this record for visibility only; do not run it while launchd is active to avoid duplicate Slack invoice requests."
+status = "PAUSED"
+rrule = "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;BYHOUR=10,15;BYMINUTE=0;BYSECOND=0"
+model = "gpt-5.3-codex"
+reasoning_effort = "low"
+execution_environment = "local"
+cwds = ["/path/to/notion-slack-automation"]

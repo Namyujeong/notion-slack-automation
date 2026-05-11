@@ -1,0 +1,65 @@
+name: Notion team weekly meeting copy
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run mode"
+        required: true
+        default: "dry-run"
+        type: choice
+        options:
+          - dry-run
+          - apply
+
+permissions:
+  contents: read
+
+concurrency:
+  group: notion-team-weekly-meeting-copy
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TZ: Asia/Seoul
+      RUN_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'apply' }}
+      NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+      MEETINGS_DATABASE_ID: ${{ vars.TEAM_MEETINGS_DATABASE_ID }}
+      MEETING_SLACK_BOT_TOKEN: ${{ secrets.TEAM_SLACK_BOT_TOKEN }}
+      MEETING_SLACK_NOTIFY: ${{ vars.TEAM_MEETING_SLACK_NOTIFY || '0' }}
+      MEETING_SLACK_CHANNEL_ID: ${{ vars.TEAM_MEETING_SLACK_CHANNEL_ID }}
+      MEETING_SLACK_MENTION: ${{ vars.TEAM_MEETING_SLACK_MENTION }}
+      TEAM_SHARED_SCHEDULE_URL: ${{ vars.TEAM_SHARED_SCHEDULE_URL }}
+      SLACK_FAILURE_WEBHOOK_URL: ${{ secrets.SLACK_FAILURE_WEBHOOK_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate config
+        run: npm run validate:config -- team-weekly-meeting
+
+      - name: Check meeting jobs
+        run: npm run check:meeting
+
+      - name: Run team weekly meeting copy
+        run: |
+          if [ "$RUN_MODE" = "dry-run" ]; then
+            npm run dry-run:team-weekly
+          else
+            npm run run:team-weekly
+          fi
+
+      - name: Notify failure
+        if: failure()
+        env:
+          AUTOMATION_NAME: Notion team weekly meeting copy
+        run: node scripts/notify-workflow-failure.mjs

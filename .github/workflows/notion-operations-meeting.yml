@@ -1,0 +1,62 @@
+name: Notion Operations meeting copy
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run mode"
+        required: true
+        default: "dry-run"
+        type: choice
+        options:
+          - dry-run
+          - apply
+
+permissions:
+  contents: read
+
+concurrency:
+  group: notion-operations-meeting-copy
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TZ: Asia/Seoul
+      RUN_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'apply' }}
+      NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+      MEETINGS_DATABASE_ID: ${{ vars.OPERATIONS_MEETINGS_DATABASE_ID }}
+      SLACK_FAILURE_WEBHOOK_URL: ${{ secrets.SLACK_FAILURE_WEBHOOK_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate config
+        run: npm run validate:config -- operations-meeting
+
+      - name: Check meeting jobs
+        run: npm run check:meeting
+
+      - name: Run Operations meeting copy
+        run: |
+          if [ "$RUN_MODE" = "dry-run" ]; then
+            npm run dry-run:operations
+          else
+            npm run run:operations
+          fi
+
+      - name: Notify failure
+        if: failure()
+        env:
+          AUTOMATION_NAME: Notion Operations meeting copy
+        run: node scripts/notify-workflow-failure.mjs

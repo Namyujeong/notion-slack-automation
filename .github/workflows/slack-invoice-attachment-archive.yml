@@ -1,0 +1,95 @@
+name: Slack invoice attachment archive
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run mode"
+        required: true
+        default: "dry-run"
+        type: choice
+        options:
+          - dry-run
+          - apply
+
+permissions:
+  contents: write
+
+concurrency:
+  group: slack-invoice-attachment-archive
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TZ: Asia/Seoul
+      RUN_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'apply' }}
+      SLACK_BOT_TOKEN: ${{ secrets.INVOICE_SLACK_BOT_TOKEN }}
+      INVOICE_SLACK_CHANNEL_ID: ${{ vars.INVOICE_SLACK_CHANNEL_ID }}
+      INVOICE_STATE_FILE: state/slack-invoice-request-state.json
+      INVOICE_ARCHIVE_STATE_FILE: state/slack-invoice-archive-state.json
+      INVOICE_ARCHIVE_LOOKBACK_DAYS: "60"
+      INVOICE_ARCHIVE_ONLY_TARGET_USER_FILES: "1"
+      INVOICE_ARCHIVE_FOLDER_LAYOUT: fiscal-year/period
+      INVOICE_ARCHIVE_STATUS_FILE: "1"
+      INVOICE_ARCHIVE_MAX_FILES_PER_RUN: "100"
+      GOOGLE_DRIVE_INVOICE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_INVOICE_FOLDER_ID }}
+      GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+      GOOGLE_DRIVE_SCOPE: https://www.googleapis.com/auth/drive
+      SLACK_FAILURE_WEBHOOK_URL: ${{ secrets.INVOICE_FAILURE_WEBHOOK_URL || secrets.SLACK_FAILURE_WEBHOOK_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate config
+        run: npm run validate:config -- invoice-archive
+
+      - name: Check Slack jobs
+        run: npm run check:slack
+
+      - name: Run invoice attachment archive
+        run: |
+          mkdir -p state
+          if [ "$RUN_MODE" = "dry-run" ]; then
+            node jobs/invoice-attachment-archive/index.mjs --dry-run --check-slack
+          else
+            npm run run:invoice-archive
+          fi
+
+      - name: Commit state
+        if: env.RUN_MODE == 'apply'
+        run: |
+          if [ -z "$(git status --porcelain -- state)" ]; then
+            echo "No state changes."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state
+          git commit -m "Update invoice archive state [skip ci]"
+
+          for attempt in 1 2 3; do
+            git pull --rebase origin "$GITHUB_REF_NAME"
+            if git push; then
+              exit 0
+            fi
+            sleep 5
+          done
+
+          echo "Failed to push state changes."
+          exit 1
+
+      - name: Notify failure
+        if: failure()
+        env:
+          AUTOMATION_NAME: Slack invoice attachment archive
+        run: node scripts/notify-workflow-failure.mjs

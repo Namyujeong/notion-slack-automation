@@ -1,0 +1,95 @@
+name: Slack Flex reaction reminder
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run mode"
+        required: true
+        default: "dry-run"
+        type: choice
+        options:
+          - dry-run
+          - apply
+
+permissions:
+  contents: write
+
+concurrency:
+  group: slack-flex-reaction-reminder
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TZ: Asia/Seoul
+      RUN_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'apply' }}
+      SLACK_BOT_TOKEN: ${{ secrets.FLEX_SLACK_BOT_TOKEN }}
+      FLEX_SLACK_CHANNEL_ID: ${{ vars.FLEX_SLACK_CHANNEL_ID }}
+      FLEX_MESSAGE_MARKER: ${{ vars.FLEX_MESSAGE_MARKER || '[Reaction reminder]' }}
+      FLEX_REACTION_NAME: white_check_mark
+      FLEX_CHECK_AFTER_MINUTES: "180"
+      FLEX_REMINDER_INTERVAL_MINUTES: "120"
+      FLEX_MAX_REMINDERS: "2"
+      FLEX_LOOKBACK_HOURS: "24"
+      FLEX_STATE_FILE: state/slack-flex-reaction-reminder-state.json
+      FLEX_FILTER_INACTIVE_USERS: "1"
+      FLEX_EXCLUDED_USER_IDS: ${{ vars.FLEX_EXCLUDED_USER_IDS }}
+      FLEX_TARGET_USER_IDS: ${{ vars.FLEX_TARGET_USER_IDS }}
+      SLACK_FAILURE_WEBHOOK_URL: ${{ secrets.FLEX_FAILURE_WEBHOOK_URL || secrets.SLACK_FAILURE_WEBHOOK_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate config
+        run: npm run validate:config -- flex-reminder
+
+      - name: Check Slack jobs
+        run: npm run check:slack
+
+      - name: Run Flex reaction reminder
+        run: |
+          mkdir -p state
+          if [ "$RUN_MODE" = "dry-run" ]; then
+            npm run dry-run:flex
+          else
+            npm run run:flex
+          fi
+
+      - name: Commit state
+        if: env.RUN_MODE == 'apply'
+        run: |
+          if [ -z "$(git status --porcelain -- state)" ]; then
+            echo "No state changes."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state
+          git commit -m "Update Flex reminder state [skip ci]"
+
+          for attempt in 1 2 3; do
+            git pull --rebase origin "$GITHUB_REF_NAME"
+            if git push; then
+              exit 0
+            fi
+            sleep 5
+          done
+
+          echo "Failed to push state changes."
+          exit 1
+
+      - name: Notify failure
+        if: failure()
+        env:
+          AUTOMATION_NAME: Slack Flex reaction reminder
+        run: node scripts/notify-workflow-failure.mjs

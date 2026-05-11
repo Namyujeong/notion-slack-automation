@@ -1,0 +1,47 @@
+{
+  "name": "notion-slack-automation",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Notion, Slack, and Google Drive automation jobs",
+  "bin": {
+    "notion-weekly-meeting-bot": "./jobs/weekly-meeting-copy/index.mjs",
+    "notion-operations-meeting-bot": "./jobs/operations-meeting-copy/index.mjs",
+    "notion-team-weekly-meeting-bot": "./jobs/team-weekly-meeting-copy/index.mjs",
+    "notion-issue-slack-reminder": "./jobs/issue-tracker-slack-reminder/index.mjs",
+    "slack-flex-reaction-reminder": "./jobs/flex-reaction-reminder/index.mjs",
+    "slack-invoice-request": "./jobs/invoice-request/index.mjs",
+    "slack-invoice-attachment-archive": "./jobs/invoice-attachment-archive/index.mjs",
+    "slack-channel-cleanup": "./jobs/slack-channel-cleanup/index.mjs"
+  },
+  "scripts": {
+    "check": "node --check lib/korean-holiday-fallbacks.mjs && node --check lib/korean-holidays.mjs && node --check lib/meeting-copy-helpers.mjs && node --check lib/meeting-copy.mjs && node --check lib/slack-due-reminder-helpers.mjs && node --check lib/flex-reaction-reminder-helpers.mjs && node --check lib/invoice-request-helpers.mjs && node --check lib/invoice-attachment-archive-helpers.mjs && node --check lib/slack-channel-cleanup-helpers.mjs && node --check scripts/check-secrets.mjs && node --check scripts/validate-config.mjs && node --check scripts/notify-workflow-failure.mjs && node --check scripts/audit-korean-holiday-fallbacks.mjs && node --check jobs/weekly-meeting-copy/index.mjs && node --check jobs/operations-meeting-copy/index.mjs && node --check jobs/team-weekly-meeting-copy/index.mjs && node --check jobs/issue-tracker-slack-reminder/index.mjs && node --check jobs/flex-reaction-reminder/index.mjs && node --check jobs/invoice-request/index.mjs && node --check jobs/invoice-attachment-archive/index.mjs && node --check jobs/slack-channel-cleanup/index.mjs && node --check index.mjs && node --check slack_due_reminder.mjs",
+    "check:meeting": "node --check lib/korean-holiday-fallbacks.mjs && node --check lib/korean-holidays.mjs && node --check lib/meeting-copy-helpers.mjs && node --check lib/meeting-copy.mjs && node --check jobs/weekly-meeting-copy/index.mjs && node --check jobs/operations-meeting-copy/index.mjs && node --check jobs/team-weekly-meeting-copy/index.mjs && node --check index.mjs",
+    "check:slack": "node --check lib/korean-holiday-fallbacks.mjs && node --check lib/korean-holidays.mjs && node --check lib/slack-due-reminder-helpers.mjs && node --check lib/flex-reaction-reminder-helpers.mjs && node --check lib/invoice-request-helpers.mjs && node --check lib/invoice-attachment-archive-helpers.mjs && node --check lib/slack-channel-cleanup-helpers.mjs && node --check jobs/issue-tracker-slack-reminder/index.mjs && node --check jobs/flex-reaction-reminder/index.mjs && node --check jobs/invoice-request/index.mjs && node --check jobs/invoice-attachment-archive/index.mjs && node --check jobs/slack-channel-cleanup/index.mjs && node --check slack_due_reminder.mjs",
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "validate:config": "node scripts/validate-config.mjs",
+    "audit:holidays": "node scripts/audit-korean-holiday-fallbacks.mjs",
+    "test": "node --test",
+    "dry-run": "node jobs/weekly-meeting-copy/index.mjs --dry-run",
+    "dry-run:weekly": "node jobs/weekly-meeting-copy/index.mjs --dry-run",
+    "dry-run:operations": "node jobs/operations-meeting-copy/index.mjs --dry-run",
+    "dry-run:team-weekly": "node jobs/team-weekly-meeting-copy/index.mjs --dry-run",
+    "dry-run:slack": "node jobs/issue-tracker-slack-reminder/index.mjs --dry-run",
+    "dry-run:flex": "node jobs/flex-reaction-reminder/index.mjs --dry-run",
+    "dry-run:invoice": "node jobs/invoice-request/index.mjs --dry-run",
+    "dry-run:invoice-archive": "node jobs/invoice-attachment-archive/index.mjs --dry-run",
+    "dry-run:channel-cleanup": "node jobs/slack-channel-cleanup/index.mjs --dry-run --check-slack",
+    "run": "node jobs/weekly-meeting-copy/index.mjs --apply",
+    "run:weekly": "node jobs/weekly-meeting-copy/index.mjs --apply",
+    "run:operations": "node jobs/operations-meeting-copy/index.mjs --apply",
+    "run:team-weekly": "node jobs/team-weekly-meeting-copy/index.mjs --apply",
+    "run:slack": "node jobs/issue-tracker-slack-reminder/index.mjs --apply",
+    "run:flex": "node jobs/flex-reaction-reminder/index.mjs --apply",
+    "run:invoice": "node jobs/invoice-request/index.mjs --apply",
+    "run:invoice-archive": "node jobs/invoice-attachment-archive/index.mjs --apply",
+    "run:channel-cleanup": "node jobs/slack-channel-cleanup/index.mjs --apply"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}

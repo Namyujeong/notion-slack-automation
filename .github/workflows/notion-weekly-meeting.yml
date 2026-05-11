@@ -1,0 +1,63 @@
+name: Notion weekly meeting copy
+
+on:
+  schedule:
+    - cron: "0 1 * * 1"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run mode"
+        required: true
+        default: "dry-run"
+        type: choice
+        options:
+          - dry-run
+          - apply
+
+permissions:
+  contents: read
+
+concurrency:
+  group: notion-weekly-meeting-copy
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TZ: Asia/Seoul
+      RUN_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'apply' }}
+      NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+      MEETINGS_DATABASE_ID: ${{ vars.WEEKLY_MEETINGS_DATABASE_ID }}
+      OPERATIONS_WEEKLY_AGENDA_URL: ${{ vars.OPERATIONS_WEEKLY_AGENDA_URL }}
+      SLACK_FAILURE_WEBHOOK_URL: ${{ secrets.SLACK_FAILURE_WEBHOOK_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate config
+        run: npm run validate:config -- weekly-meeting
+
+      - name: Check meeting jobs
+        run: npm run check:meeting
+
+      - name: Run weekly meeting copy
+        run: |
+          if [ "$RUN_MODE" = "dry-run" ]; then
+            npm run dry-run:weekly
+          else
+            npm run run:weekly
+          fi
+
+      - name: Notify failure
+        if: failure()
+        env:
+          AUTOMATION_NAME: Notion weekly meeting copy
+        run: node scripts/notify-workflow-failure.mjs

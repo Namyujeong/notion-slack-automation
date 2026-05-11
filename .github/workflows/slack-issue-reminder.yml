@@ -1,0 +1,96 @@
+name: Slack issue due reminder
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run mode"
+        required: true
+        default: "dry-run"
+        type: choice
+        options:
+          - dry-run
+          - apply
+
+permissions:
+  contents: write
+
+concurrency:
+  group: slack-issue-due-reminder
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TZ: Asia/Seoul
+      RUN_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'apply' }}
+      NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+      SLACK_BOT_TOKEN: ${{ secrets.OPS_SLACK_BOT_TOKEN }}
+      SLACK_DELIVERY: channel
+      SLACK_CHANNEL_ID: ${{ vars.ISSUE_REMINDER_SLACK_CHANNEL_ID }}
+      SLACK_USER_MAP_JSON: ${{ secrets.SLACK_USER_MAP_JSON }}
+      ISSUE_SOURCE_ID: ${{ vars.ISSUE_SOURCE_ID }}
+      DUE_DATE_PROPERTY: Date
+      ASSIGNEE_PROPERTY: Person
+      DONE_PROPERTY: Status
+      DAYS_AHEAD: "1"
+      LOOKBACK_DAYS: "30"
+      REMINDER_STATE_FILE: state/slack-due-reminder-state.json
+      SLACK_REMINDER_SKIP_KR_HOLIDAYS: "1"
+      SLACK_FAILURE_WEBHOOK_URL: ${{ secrets.DUE_REMINDER_FAILURE_WEBHOOK_URL || secrets.SLACK_FAILURE_WEBHOOK_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate config
+        run: npm run validate:config -- issue-reminder
+
+      - name: Check Slack jobs
+        run: npm run check:slack
+
+      - name: Run due reminder
+        run: |
+          mkdir -p state
+          if [ "$RUN_MODE" = "dry-run" ]; then
+            npm run dry-run:slack
+          else
+            npm run run:slack
+          fi
+
+      - name: Commit state
+        if: env.RUN_MODE == 'apply'
+        run: |
+          if [ -z "$(git status --porcelain -- state)" ]; then
+            echo "No state changes."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state
+          git commit -m "Update due reminder state [skip ci]"
+
+          for attempt in 1 2 3; do
+            git pull --rebase origin "$GITHUB_REF_NAME"
+            if git push; then
+              exit 0
+            fi
+            sleep 5
+          done
+
+          echo "Failed to push state changes."
+          exit 1
+
+      - name: Notify failure
+        if: failure()
+        env:
+          AUTOMATION_NAME: Slack issue due reminder
+        run: node scripts/notify-workflow-failure.mjs

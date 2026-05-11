@@ -1,0 +1,90 @@
+name: Slack channel cleanup
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run mode"
+        required: true
+        default: "dry-run"
+        type: choice
+        options:
+          - dry-run
+          - apply
+
+permissions:
+  contents: write
+
+concurrency:
+  group: slack-channel-cleanup
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TZ: Asia/Seoul
+      RUN_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'apply' }}
+      SLACK_USER_TOKEN: ${{ secrets.SLACK_USER_TOKEN }}
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+      CHANNEL_CLEANUP_STATE_FILE: state/slack-channel-cleanup-state.json
+      CHANNEL_CLEANUP_INACTIVE_DAYS: "365"
+      CHANNEL_CLEANUP_NOTICE_DAYS: "14"
+      CHANNEL_CLEANUP_REQUIRE_KST_HOUR: "14"
+      CHANNEL_CLEANUP_JOIN_BEFORE_ARCHIVE: "1"
+      SLACK_FAILURE_WEBHOOK_URL: ${{ secrets.SLACK_FAILURE_WEBHOOK_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate config
+        run: npm run validate:config -- slack-channel-cleanup
+
+      - name: Check Slack jobs
+        run: npm run check:slack
+
+      - name: Run Slack channel cleanup
+        run: |
+          mkdir -p state
+          if [ "$RUN_MODE" = "dry-run" ]; then
+            npm run dry-run:channel-cleanup
+          else
+            npm run run:channel-cleanup
+          fi
+
+      - name: Commit state
+        if: env.RUN_MODE == 'apply'
+        run: |
+          if [ -z "$(git status --porcelain -- state)" ]; then
+            echo "No state changes."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state
+          git commit -m "Update Slack channel cleanup state [skip ci]"
+
+          for attempt in 1 2 3; do
+            git pull --rebase origin "$GITHUB_REF_NAME"
+            if git push; then
+              exit 0
+            fi
+            sleep 5
+          done
+
+          echo "Failed to push state changes."
+          exit 1
+
+      - name: Notify failure
+        if: failure()
+        env:
+          AUTOMATION_NAME: Slack channel cleanup
+        run: node scripts/notify-workflow-failure.mjs
