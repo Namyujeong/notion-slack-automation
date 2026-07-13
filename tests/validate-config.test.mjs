@@ -25,6 +25,8 @@ function baseEnv(overrides = {}) {
     FLEX_REMINDER_INTERVAL_MINUTES: "60",
     FLEX_MAX_REMINDERS: "3",
     FLEX_LOOKBACK_HOURS: "24",
+    FLEX_JOB: "reminder",
+    FLEX_TARGET_USER_IDS: "U123ABC,U456DEF",
     INVOICE_SLACK_CHANNEL_ID: "C1234567890",
     INVOICE_REQUEST_TARGETS_JSON: JSON.stringify([{ name: "Kevin", slackUserId: "U123ABC" }]),
     INVOICE_STATE_FILE: "state/slack-invoice-request-state.json",
@@ -118,6 +120,16 @@ test("config validator rejects missing and malformed values", () => {
   assert.match(result.errors.join("\n"), /NOTION_TOKEN is required/);
   assert.match(result.errors.join("\n"), /SLACK_CHANNEL_ID must look like/);
   assert.match(result.errors.join("\n"), /SLACK_USER_MAP_JSON must be valid JSON/);
+});
+
+test("Flex source creation requires explicit target users", () => {
+  const result = validateConfig("flex-reminder", baseEnv({
+    FLEX_JOB: "source",
+    FLEX_TARGET_USER_IDS: "",
+  }));
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join("\n"), /FLEX_TARGET_USER_IDS is required/);
 });
 
 test("invoice archive requires Google Drive credentials only for apply mode", () => {

@@ -165,6 +165,8 @@ function validateFlexReminder(env, errors) {
   requireInteger(env, errors, "FLEX_REMINDER_INTERVAL_MINUTES", { min: 1 });
   requireInteger(env, errors, "FLEX_MAX_REMINDERS", { min: 1 });
   requireInteger(env, errors, "FLEX_LOOKBACK_HOURS", { min: 1 });
+  optionalEnum(env, errors, "FLEX_JOB", ["source", "reminder"]);
+  if (env.FLEX_JOB === "source") requireEnv(env, errors, "FLEX_TARGET_USER_IDS");
 }
 
 function validateInvoiceRequest(env, errors) {

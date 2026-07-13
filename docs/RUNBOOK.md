@@ -10,7 +10,7 @@
 4. 외부 API 실패면 Notion/Slack/Google 권한과 rate limit, 대상 채널/DB 접근 권한을 확인합니다.
 5. 중복 발송 또는 미발송이면 `state/*.json` 변경 내역을 확인합니다.
 
-Slack 메시지 발송/수집 계열 workflow는 GitHub 내부 `schedule`이 아니라 외부 스케줄러의 `workflow_dispatch` 호출이 primary trigger입니다. 정시에 실행되지 않았으면 외부 스케줄러의 HTTP call 로그를 먼저 확인합니다.
+Flex를 제외한 Slack 메시지 발송/수집 계열 workflow는 외부 스케줄러의 `workflow_dispatch` 호출이 primary trigger입니다. 정시에 실행되지 않았으면 외부 스케줄러의 HTTP call 로그를 먼저 확인합니다. Flex는 GitHub Actions 자체 schedule과 실행 이력을 확인합니다.
 
 ## 수동 실행
 
@@ -30,6 +30,8 @@ GitHub Actions에서 각 workflow의 `Run workflow`를 사용합니다.
 
 실제 반영 전에는 `dry-run` 결과를 먼저 확인합니다. 문제가 없으면 같은 workflow를 `apply`로 다시 실행합니다.
 
+Flex 수동 실행은 `task=source`가 원본 메시지 생성, `task=reminder`가 기존 원본 스레드의 미확인자 리마인드입니다. 기본값은 오발송 방지를 위해 `reminder`입니다.
+
 Operations 문서 복사에서 같은 날짜의 문서가 이미 있어도 다시 생성해야 하는 경우에만 `force`를 켭니다. `apply`와 `force`를 함께 선택하면 같은 날짜와 제목의 문서가 추가로 생성될 수 있으므로 장애 복구나 명시적인 재생성에만 사용합니다. 정기 실행에서는 `force`가 항상 꺼집니다.
 
 ## 로컬 드라이런
@@ -40,6 +42,7 @@ npm run dry-run:operations
 npm run dry-run:team-weekly
 npm run dry-run:slack
 npm run dry-run:flex
+npm run dry-run:flex:source
 npm run dry-run:invoice
 npm run dry-run:invoice-archive
 npm run dry-run:channel-cleanup
@@ -141,10 +144,10 @@ team issue 리마인더는 미완료 이슈가 없거나, due date가 조회 범
 - 전체 state 파일 삭제는 과거 항목까지 재발송할 수 있으므로 피합니다.
 - 수정 후 PR로 남기고 GitHub Actions에서 수동 `apply`를 실행합니다.
 
-Flex 원본 요청이 15:00/18:00에 새 채널 메시지로 다시 올라오면 GitHub `slack-flex-reaction-reminder.yml` 문제가 아니라 Slack Workflow Builder 또는 별도 스케줄러의 중복 원본 발송일 가능성이 높습니다.
+Flex 원본 요청이 하루에 두 번 이상 올라오면 Slack Workflow Builder, Codex automation 또는 별도 스케줄러의 중복 실행 가능성이 높습니다.
 
 - 의도한 구조는 월요일 11:00 KST 원본 요청 1회, 15:00/18:00 KST 스레드 리마인더입니다.
-- Slack Workflow Builder에는 11:00 원본 요청만 남기고, 15:00/18:00 새 메시지 발송 workflow는 비활성화합니다.
+- 원본과 리마인드를 모두 GitHub Actions가 담당하므로 기존 Slack Workflow Builder와 Codex automation은 비활성화합니다.
 - GitHub Flex job 로그에 `duplicate Flex source`가 보이면 같은 날 원본 메시지가 2개 이상 감지된 것입니다. 봇은 가장 이른 원본만 처리하고 나머지는 무시합니다.
 - 로컬 `launchd` 경로는 production에서 사용하지 않습니다. `~/Library/LaunchAgents/com.example.flex-reaction-reminder.plist`가 로드되어 있으면 내려야 합니다.
 

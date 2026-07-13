@@ -29,6 +29,7 @@ async function loadEnvFile(filePath, { override = false } = {}) {
 await loadEnvFile(path.join(process.cwd(), ".env.slack.local"));
 await loadEnvFile(path.join(process.cwd(), ".env.flex.local"), { override: true });
 
+const flexJob = argv.has("--source") ? "source" : String(process.env.FLEX_JOB || "reminder").trim().toLowerCase();
 const slackToken = process.env.SLACK_BOT_TOKEN;
 const channelId = process.env.FLEX_SLACK_CHANNEL_ID || process.env.SLACK_CHANNEL_ID;
 const marker = process.env.FLEX_MESSAGE_MARKER || process.env.SLACK_MESSAGE_MARKER;
@@ -42,10 +43,14 @@ const explicitTargets = splitUserIds(process.env.FLEX_TARGET_USER_IDS || process
 const excludedTargets = new Set(splitUserIds(process.env.FLEX_EXCLUDED_USER_IDS || process.env.SLACK_EXCLUDED_USER_IDS));
 const expandUsergroups = envBool(process.env.FLEX_EXPAND_USERGROUPS || process.env.SLACK_EXPAND_USERGROUPS);
 const filterInactiveUsers = process.env.FLEX_FILTER_INACTIVE_USERS !== "0";
+const sourceChannelMention = process.env.FLEX_SOURCE_CHANNEL_MENTION !== "0";
+const sourceFlexUrl = process.env.FLEX_SOURCE_URL || "https://www.flex.team/";
 
 if (!slackToken) throw new Error("SLACK_BOT_TOKEN is required.");
 if (!channelId) throw new Error("FLEX_SLACK_CHANNEL_ID is required.");
 if (!marker) throw new Error("FLEX_MESSAGE_MARKER is required.");
+if (!["source", "reminder"].includes(flexJob)) throw new Error("FLEX_JOB must be source or reminder.");
+if (flexJob === "source" && !explicitTargets.length) throw new Error("FLEX_TARGET_USER_IDS is required for source creation.");
 
 function envBool(value) {
   return flexHelpers.envBool(value);
@@ -227,113 +232,165 @@ async function postThreadReminder(messageTs, text) {
   }, { httpMethod: "POST" });
 }
 
-const state = await readState();
-const nowMs = Date.now();
-const oldest = String(Math.floor((nowMs - lookbackHours * 60 * 60 * 1000) / 1000));
-const messages = await conversationsHistory(oldest);
-const matchingMessages = messages
-  .filter((message) => message.ts && messageSearchText(message).includes(marker))
-  .sort((a, b) => Number(a.ts) - Number(b.ts));
-const { canonicalMessages, duplicateMessages } = flexHelpers.splitCanonicalDailySourceMessages(matchingMessages);
-
-console.log(`Found ${matchingMessages.length} matching message(s) in channel ${channelId} for marker ${JSON.stringify(marker)}.`);
-if (duplicateMessages.length) {
-  for (const { message, sourceDate, canonicalTs } of duplicateMessages) {
-    console.log(`Skip ${message.ts}: duplicate Flex source for ${sourceDate}; canonical source is ${canonicalTs}.`);
-  }
+async function postSourceMessage(text) {
+  return slack("chat.postMessage", {
+    channel: channelId,
+    text,
+    unfurl_links: false,
+    unfurl_media: false,
+  }, { httpMethod: "POST" });
 }
 
-let postedCount = 0;
-let stateChanged = false;
+async function runSourceCreation() {
+  const nowMs = Date.now();
+  const today = flexHelpers.sourceDateInSeoul(String(nowMs / 1000));
+  const oldest = String(Math.floor((nowMs - 24 * 60 * 60 * 1000) / 1000));
+  const messages = await conversationsHistory(oldest);
+  const existing = messages.find((message) => (
+    message.ts
+    && flexHelpers.sourceDateInSeoul(message.ts) === today
+    && messageSearchText(message).includes(marker)
+  ));
 
-for (const message of canonicalMessages) {
-  const messageTs = message.ts;
-  const key = messageKey(messageTs);
-  const stateEntry = state.messages[key] || {};
-
-  if (stateEntry.status === "complete") {
-    console.log(`Skip ${messageTs}: already complete.`);
-    continue;
+  if (existing) {
+    console.log(`Skip source creation: ${today} source already exists at ${existing.ts}.`);
+    return;
   }
 
-  const ageMinutes = (nowMs - Number(messageTs) * 1000) / 60_000;
-  if (ageMinutes < checkAfterMinutes) {
-    console.log(`Skip ${messageTs}: age ${ageMinutes.toFixed(1)}m < ${checkAfterMinutes}m.`);
-    continue;
+  const targets = await filterActiveTargets(explicitTargets);
+  if (!targets.length) throw new Error("No active Flex source target users remain after filtering.");
+  const text = flexHelpers.buildSourceMessage(targets, {
+    marker,
+    reactionName,
+    channelMention: sourceChannelMention,
+    flexUrl: sourceFlexUrl,
+  });
+
+  if (dryRun) {
+    console.log(`[DRY_RUN] Would post Flex source to ${channelId}:\n${text}`);
+    console.log("Done. Dry run only; source was not posted.");
+    return;
   }
 
-  const targets = await filterActiveTargets(await resolveTargets(message));
-  if (!targets.length) {
-    console.log(`Skip ${messageTs}: no active target users found.`);
-    continue;
-  }
+  const data = await postSourceMessage(text);
+  console.log(`Posted Flex source for ${today} to ${channelId}: ${data.ts}`);
+}
 
-  const reactedUsers = await reactionUsers(messageTs);
-  const missingUsers = targets.filter((userId) => !reactedUsers.has(userId));
-  const reactedTargetCount = targets.filter((userId) => reactedUsers.has(userId)).length;
+async function runReminders() {
+  const state = await readState();
+  const nowMs = Date.now();
+  const oldest = String(Math.floor((nowMs - lookbackHours * 60 * 60 * 1000) / 1000));
+  const messages = await conversationsHistory(oldest);
+  const matchingMessages = messages
+    .filter((message) => message.ts && messageSearchText(message).includes(marker))
+    .sort((a, b) => Number(a.ts) - Number(b.ts));
+  const { canonicalMessages, duplicateMessages } = flexHelpers.splitCanonicalDailySourceMessages(matchingMessages);
 
-  if (!missingUsers.length) {
-    if (!dryRun) {
-      state.messages[key] = {
-        ...stateEntry,
-        status: "complete",
-        updatedAt: new Date().toISOString(),
-        completedAtMs: nowMs,
-        targetUserIds: targets,
-      };
-      stateChanged = true;
+  console.log(`Found ${matchingMessages.length} matching message(s) in channel ${channelId} for marker ${JSON.stringify(marker)}.`);
+  if (duplicateMessages.length) {
+    for (const { message, sourceDate, canonicalTs } of duplicateMessages) {
+      console.log(`Skip ${message.ts}: duplicate Flex source for ${sourceDate}; canonical source is ${canonicalTs}.`);
     }
-    console.log(`Complete ${messageTs}: ${reactedTargetCount}/${targets.length}.`);
-    continue;
   }
 
-  if (!shouldSendReminder(stateEntry, nowMs)) {
-    const elapsedMinutes = (nowMs - Number(stateEntry.lastRemindedAtMs)) / 60_000;
-    console.log(`Skip ${messageTs}: last reminder ${elapsedMinutes.toFixed(1)}m ago < ${reminderIntervalMinutes}m.`);
-    continue;
-  }
+  let postedCount = 0;
+  let stateChanged = false;
 
-  const reminderNumber = Number(stateEntry.reminderCount || 0) + 1;
-  if (reminderNumber > maxReminders) {
-    if (stateEntry.status !== "maxed" && !dryRun) {
+  for (const message of canonicalMessages) {
+    const messageTs = message.ts;
+    const key = messageKey(messageTs);
+    const stateEntry = state.messages[key] || {};
+
+    if (stateEntry.status === "complete") {
+      console.log(`Skip ${messageTs}: already complete.`);
+      continue;
+    }
+
+    const ageMinutes = (nowMs - Number(messageTs) * 1000) / 60_000;
+    if (ageMinutes < checkAfterMinutes) {
+      console.log(`Skip ${messageTs}: age ${ageMinutes.toFixed(1)}m < ${checkAfterMinutes}m.`);
+      continue;
+    }
+
+    const targets = await filterActiveTargets(await resolveTargets(message));
+    if (!targets.length) {
+      console.log(`Skip ${messageTs}: no active target users found.`);
+      continue;
+    }
+
+    const reactedUsers = await reactionUsers(messageTs);
+    const missingUsers = targets.filter((userId) => !reactedUsers.has(userId));
+    const reactedTargetCount = targets.filter((userId) => reactedUsers.has(userId)).length;
+
+    if (!missingUsers.length) {
+      if (!dryRun) {
+        state.messages[key] = {
+          ...stateEntry,
+          status: "complete",
+          updatedAt: new Date().toISOString(),
+          completedAtMs: nowMs,
+          targetUserIds: targets,
+        };
+        stateChanged = true;
+      }
+      console.log(`Complete ${messageTs}: ${reactedTargetCount}/${targets.length}.`);
+      continue;
+    }
+
+    if (!shouldSendReminder(stateEntry, nowMs)) {
+      const elapsedMinutes = (nowMs - Number(stateEntry.lastRemindedAtMs)) / 60_000;
+      console.log(`Skip ${messageTs}: last reminder ${elapsedMinutes.toFixed(1)}m ago < ${reminderIntervalMinutes}m.`);
+      continue;
+    }
+
+    const reminderNumber = Number(stateEntry.reminderCount || 0) + 1;
+    if (reminderNumber > maxReminders) {
+      if (stateEntry.status !== "maxed" && !dryRun) {
+        state.messages[key] = {
+          ...stateEntry,
+          status: "maxed",
+          updatedAt: new Date().toISOString(),
+          missingUserIds: missingUsers,
+          targetUserIds: targets,
+        };
+        stateChanged = true;
+      }
+      console.log(`Skip ${messageTs}: reminder limit reached (${maxReminders}).`);
+      continue;
+    }
+
+    const reminderText = buildReminderText(missingUsers, reminderNumber, targets.length, reactedTargetCount);
+
+    if (dryRun) {
+      console.log(`[DRY_RUN] Would post to thread ${messageTs}:\n${reminderText}`);
+    } else {
+      await postThreadReminder(messageTs, reminderText);
+      postedCount += 1;
       state.messages[key] = {
-        ...stateEntry,
-        status: "maxed",
+        status: reminderNumber >= maxReminders ? "maxed" : "reminded",
         updatedAt: new Date().toISOString(),
+        lastRemindedAtMs: nowMs,
+        reminderCount: reminderNumber,
         missingUserIds: missingUsers,
         targetUserIds: targets,
       };
       stateChanged = true;
+      console.log(`Posted reminder ${reminderNumber}/${maxReminders} to thread ${messageTs}: ${missingUsers.join(",")}`);
     }
-    console.log(`Skip ${messageTs}: reminder limit reached (${maxReminders}).`);
-    continue;
   }
 
-  const reminderText = buildReminderText(missingUsers, reminderNumber, targets.length, reactedTargetCount);
-
   if (dryRun) {
-    console.log(`[DRY_RUN] Would post to thread ${messageTs}:\n${reminderText}`);
+    console.log("Done. Dry run only; state was not written.");
+  } else if (stateChanged) {
+    await writeState(state);
+    console.log(`Done. Posted reminders: ${postedCount}. State: ${stateFile}`);
   } else {
-    await postThreadReminder(messageTs, reminderText);
-    postedCount += 1;
-    state.messages[key] = {
-      status: reminderNumber >= maxReminders ? "maxed" : "reminded",
-      updatedAt: new Date().toISOString(),
-      lastRemindedAtMs: nowMs,
-      reminderCount: reminderNumber,
-      missingUserIds: missingUsers,
-      targetUserIds: targets,
-    };
-    stateChanged = true;
-    console.log(`Posted reminder ${reminderNumber}/${maxReminders} to thread ${messageTs}: ${missingUsers.join(",")}`);
+    console.log(`Done. Posted reminders: ${postedCount}. No state changes.`);
   }
 }
 
-if (dryRun) {
-  console.log("Done. Dry run only; state was not written.");
-} else if (stateChanged) {
-  await writeState(state);
-  console.log(`Done. Posted reminders: ${postedCount}. State: ${stateFile}`);
+if (flexJob === "source") {
+  await runSourceCreation();
 } else {
-  console.log(`Done. Posted reminders: ${postedCount}. No state changes.`);
+  await runReminders();
 }
