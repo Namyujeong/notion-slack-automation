@@ -41,6 +41,28 @@ Slack/Invoice workflow의 정기 실행은 외부 스케줄러가 GitHub `workfl
 
 Failure webhook은 자동화 실패 전용 incoming webhook으로 분리하는 것을 권장합니다.
 
+## GitHub Actions Variables
+
+토큰이 아닌 데이터베이스 ID, source ID, Slack channel ID는 `Settings > Secrets and variables > Actions > Variables`에 등록합니다.
+
+Operations meeting copy를 실행하려면 다음 두 설정이 반드시 필요합니다.
+
+| GitHub 설정 | 종류 | 값 |
+|---|---|---|
+| `NOTION_TOKEN` | Repository secret | Meeting Notes 데이터베이스에 연결된 Notion integration token |
+| `OPERATIONS_MEETINGS_DATABASE_ID` | Repository variable | Operations 회의 문서가 들어 있는 Meeting Notes 데이터베이스 ID |
+
+CLI로 등록할 때는 다음 명령을 사용합니다. Secret 값은 명령 기록에 남기지 않도록 대화형 입력을 사용합니다.
+
+```bash
+gh secret set NOTION_TOKEN --repo Namyujeong/notion-slack-automation
+gh variable set OPERATIONS_MEETINGS_DATABASE_ID \
+  --repo Namyujeong/notion-slack-automation \
+  --body "<database-id>"
+```
+
+등록 후 `Notion Operations meeting copy`를 먼저 `dry-run`으로 수동 실행해 integration 권한과 데이터베이스 ID를 확인합니다.
+
 ## JSON Secret 형식
 
 ### `SLACK_USER_MAP_JSON`
