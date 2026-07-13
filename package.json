@@ -27,6 +27,7 @@
     "dry-run:team-weekly": "node jobs/team-weekly-meeting-copy/index.mjs --dry-run",
     "dry-run:slack": "node jobs/issue-tracker-slack-reminder/index.mjs --dry-run",
     "dry-run:flex": "node jobs/flex-reaction-reminder/index.mjs --dry-run",
+    "dry-run:flex:source": "node jobs/flex-reaction-reminder/index.mjs --dry-run --source",
     "dry-run:invoice": "node jobs/invoice-request/index.mjs --dry-run",
     "dry-run:invoice-archive": "node jobs/invoice-attachment-archive/index.mjs --dry-run",
     "dry-run:channel-cleanup": "node jobs/slack-channel-cleanup/index.mjs --dry-run --check-slack",
@@ -36,6 +37,7 @@
     "run:team-weekly": "node jobs/team-weekly-meeting-copy/index.mjs --apply",
     "run:slack": "node jobs/issue-tracker-slack-reminder/index.mjs --apply",
     "run:flex": "node jobs/flex-reaction-reminder/index.mjs --apply",
+    "run:flex:source": "node jobs/flex-reaction-reminder/index.mjs --apply --source",
     "run:invoice": "node jobs/invoice-request/index.mjs --apply",
     "run:invoice-archive": "node jobs/invoice-attachment-archive/index.mjs --apply",
     "run:channel-cleanup": "node jobs/slack-channel-cleanup/index.mjs --apply"

@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   buildReminderText,
+  buildSourceMessage,
   envBool,
   extractUserMentions,
   extractUsergroupMentions,
@@ -102,4 +103,18 @@ test("flex duplicate source detection keeps only the first source per KST date",
     sourceDate: "2026-05-04",
     canonicalTs: "1777861091.682029",
   }]);
+});
+
+test("flex source message includes the approved channel and user mentions", () => {
+  const text = buildSourceMessage(["U111AAA", "U333CCC", "U111AAA"], {
+    marker: "[Flex 승인 리마인드]",
+    reactionName: "white_check_mark",
+    channelMention: true,
+  });
+
+  assert.match(text, /^\*\[Flex 승인 리마인드\]\*\n<!channel>/);
+  assert.match(text, /<@U111AAA> <@U333CCC>/);
+  assert.equal(text.match(/<@U111AAA>/g)?.length, 1);
+  assert.match(text, /<https:\/\/www\.flex\.team\/\|Flex - 팀원 휴가 및 워크플로우 승인하기>/);
+  assert.match(text, /:white_check_mark: 리액션/);
 });

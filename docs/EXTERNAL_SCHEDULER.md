@@ -2,6 +2,8 @@
 
 GitHub Actions `schedule` 이벤트는 GitHub 내부 스케줄러 부하에 따라 지연되거나 생성되지 않을 수 있습니다. Slack 메시지 발송처럼 정시성이 중요한 작업은 외부 스케줄러가 GitHub REST API의 `workflow_dispatch`를 호출하는 방식으로 실행합니다.
 
+Flex 휴가/결재 리마인더는 예외입니다. `slack-flex-reaction-reminder.yml` 안의 GitHub schedule이 월요일 11:00 KST 원본 생성과 15:00/18:00 KST 스레드 리마인드를 모두 담당하므로 외부 스케줄러에 중복 등록하지 않습니다.
+
 ## 운영 원칙
 
 - 외부 스케줄러는 GitHub API에 `workflow_dispatch` 요청만 보냅니다.
@@ -45,7 +47,6 @@ curl -L \
 |---|---|---|---|---|
 | Team Weekly 회의록 복사/알림 | `notion-team-weekly-meeting.yml` | `Asia/Seoul` | 월 10:00 | `{"ref":"main","inputs":{"mode":"apply"}}` |
 | team issue Slack 리마인더 | `slack-issue-reminder.yml` | `Asia/Seoul` | 월-금 10:00 | `{"ref":"main","inputs":{"mode":"apply"}}` |
-| Flex 휴가/결재 리액션 리마인더 | `slack-flex-reaction-reminder.yml` | `Asia/Seoul` | 월 15:00/18:00 | `{"ref":"main","inputs":{"mode":"apply"}}` |
 | 월별 인보이스 요청/리마인더 | `slack-invoice-request.yml` | `Asia/Seoul` | 월-금 10:00/15:00/18:00 | `{"ref":"main","inputs":{"mode":"apply"}}` |
 | 인보이스 첨부파일 Drive 보관 | `slack-invoice-attachment-archive.yml` | `Asia/Seoul` | 월-금 18:10 | `{"ref":"main","inputs":{"mode":"apply"}}` |
 | Slack 미사용 채널 정리 | `slack-channel-cleanup.yml` | `Asia/Seoul` | 매월 1일 14:00 | `{"ref":"main","inputs":{"mode":"apply"}}` |
@@ -56,12 +57,11 @@ curl -L \
 |---|---:|
 | `notion-team-weekly-meeting.yml` | `0 10 * * 1` |
 | `slack-issue-reminder.yml` | `0 10 * * 1-5` |
-| `slack-flex-reaction-reminder.yml` | `0 15,18 * * 1` |
 | `slack-invoice-request.yml` | `0 10,15,18 * * 1-5` |
 | `slack-invoice-attachment-archive.yml` | `10 18 * * 1-5` |
 | `slack-channel-cleanup.yml` | `0 14 1 * *` |
 
-Flex의 `slack-flex-reaction-reminder.yml`는 새 원본 메시지를 만들지 않고 기존 `[Flex 승인 리마인드]` 원본 스레드에만 답글을 남깁니다. Slack Workflow Builder 또는 다른 스케줄러에서 15:00/18:00에 새 원본 메시지를 보내는 작업이 있으면 중복 발송이므로 비활성화합니다.
+Flex의 `slack-flex-reaction-reminder.yml`는 11:00에 원본을 한 번 만들고 15:00/18:00에는 그 원본 스레드에만 답글을 남깁니다. Slack Workflow Builder, Codex automation, 외부 스케줄러의 기존 Flex 작업은 중복 발송을 막기 위해 비활성화합니다.
 
 UTC만 받는 스케줄러라면 아래 값을 사용합니다.
 
@@ -69,7 +69,6 @@ UTC만 받는 스케줄러라면 아래 값을 사용합니다.
 |---|---:|
 | `notion-team-weekly-meeting.yml` | `0 1 * * 1` |
 | `slack-issue-reminder.yml` | `0 1 * * 1-5` |
-| `slack-flex-reaction-reminder.yml` | `0 6,9 * * 1` |
 | `slack-invoice-request.yml` | `0 1,6,9 * * 1-5` |
 | `slack-invoice-attachment-archive.yml` | `10 9 * * 1-5` |
 | `slack-channel-cleanup.yml` | `0 5 1 * *` |

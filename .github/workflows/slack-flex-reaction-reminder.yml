@@ -1,6 +1,9 @@
 name: Slack Flex reaction reminder
 
 on:
+  schedule:
+    - cron: "0 2 * * 1"
+    - cron: "0 6,9 * * 1"
   workflow_dispatch:
     inputs:
       mode:
@@ -11,6 +14,14 @@ on:
         options:
           - dry-run
           - apply
+      task:
+        description: "Flex task"
+        required: true
+        default: "reminder"
+        type: choice
+        options:
+          - reminder
+          - source
 
 permissions:
   contents: write
@@ -26,9 +37,10 @@ jobs:
     env:
       TZ: Asia/Seoul
       RUN_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'apply' }}
+      FLEX_JOB: ${{ github.event_name == 'workflow_dispatch' && inputs.task || github.event.schedule == '0 2 * * 1' && 'source' || 'reminder' }}
       SLACK_BOT_TOKEN: ${{ secrets.FLEX_SLACK_BOT_TOKEN }}
       FLEX_SLACK_CHANNEL_ID: ${{ vars.FLEX_SLACK_CHANNEL_ID }}
-      FLEX_MESSAGE_MARKER: ${{ vars.FLEX_MESSAGE_MARKER || '[Reaction reminder]' }}
+      FLEX_MESSAGE_MARKER: ${{ vars.FLEX_MESSAGE_MARKER || '[Flex 승인 리마인드]' }}
       FLEX_REACTION_NAME: white_check_mark
       FLEX_CHECK_AFTER_MINUTES: "180"
       FLEX_REMINDER_INTERVAL_MINUTES: "120"
@@ -36,6 +48,7 @@ jobs:
       FLEX_LOOKBACK_HOURS: "24"
       FLEX_STATE_FILE: state/slack-flex-reaction-reminder-state.json
       FLEX_FILTER_INACTIVE_USERS: "1"
+      FLEX_SOURCE_CHANNEL_MENTION: "1"
       FLEX_EXCLUDED_USER_IDS: ${{ vars.FLEX_EXCLUDED_USER_IDS }}
       FLEX_TARGET_USER_IDS: ${{ vars.FLEX_TARGET_USER_IDS }}
       SLACK_FAILURE_WEBHOOK_URL: ${{ secrets.FLEX_FAILURE_WEBHOOK_URL || secrets.SLACK_FAILURE_WEBHOOK_URL }}
@@ -55,17 +68,23 @@ jobs:
       - name: Check Slack jobs
         run: npm run check:slack
 
-      - name: Run Flex reaction reminder
+      - name: Run Flex job
         run: |
           mkdir -p state
-          if [ "$RUN_MODE" = "dry-run" ]; then
+          if [ "$FLEX_JOB" = "source" ]; then
+            if [ "$RUN_MODE" = "dry-run" ]; then
+              npm run dry-run:flex:source
+            else
+              npm run run:flex:source
+            fi
+          elif [ "$RUN_MODE" = "dry-run" ]; then
             npm run dry-run:flex
           else
             npm run run:flex
           fi
 
       - name: Commit state
-        if: env.RUN_MODE == 'apply'
+        if: env.RUN_MODE == 'apply' && env.FLEX_JOB == 'reminder'
         run: |
           if [ -z "$(git status --porcelain -- state)" ]; then
             echo "No state changes."

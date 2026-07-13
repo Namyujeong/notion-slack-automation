@@ -11,7 +11,7 @@
 
 ## GitHub Actions Secrets
 
-Slack/Invoice workflow의 정기 실행은 외부 스케줄러가 GitHub `workflow_dispatch` API를 호출합니다. 외부 스케줄러용 GitHub token은 repository secret이 아니라 외부 스케줄러의 secret 저장소에 등록합니다. 자세한 요청 형식은 [External Scheduler](EXTERNAL_SCHEDULER.md)를 봅니다.
+Flex를 제외한 Slack/Invoice workflow의 정기 실행은 외부 스케줄러가 GitHub `workflow_dispatch` API를 호출합니다. Flex는 저장소의 GitHub Actions schedule을 사용합니다. 외부 스케줄러용 GitHub token은 repository secret이 아니라 외부 스케줄러의 secret 저장소에 등록합니다. 자세한 요청 형식은 [External Scheduler](EXTERNAL_SCHEDULER.md)를 봅니다.
 
 ### 필수
 
@@ -62,6 +62,17 @@ gh variable set OPERATIONS_MEETINGS_DATABASE_ID \
 ```
 
 등록 후 `Notion Operations meeting copy`를 먼저 `dry-run`으로 수동 실행해 integration 권한과 데이터베이스 ID를 확인합니다.
+
+Flex 휴가/결재 리마인더에는 다음 설정이 필요합니다.
+
+| GitHub 설정 | 종류 | 값 |
+|---|---|---|
+| `FLEX_SLACK_BOT_TOKEN` | Repository secret | `chat:write`, 채널 기록, `reactions:read`, `users:read` 권한이 있는 Bot token |
+| `FLEX_SLACK_CHANNEL_ID` | Repository variable | 원본과 스레드 리마인드를 보낼 Slack 채널 ID |
+| `FLEX_MESSAGE_MARKER` | Repository variable | 원본 식별 문구. 기본값은 `[Flex 승인 리마인드]` |
+| `FLEX_TARGET_USER_IDS` | Repository variable | 11시 원본에서 멘션할 리드 Slack user ID 목록 |
+
+`FLEX_TARGET_USER_IDS`는 쉼표로 구분합니다. 삭제·비활성·봇 계정은 `users.info` 결과에 따라 자동 제외됩니다.
 
 ## JSON Secret 형식
 

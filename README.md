@@ -4,7 +4,7 @@ Notion, Slack, Google Drive를 연결해 반복 운영 업무를 자동화하는
 
 이 저장소는 공개 공유용 sanitized snapshot입니다. 실제 워크스페이스 ID, Notion URL, Slack channel/user ID, Google Drive folder ID, 토큰, 실행 state는 포함하지 않습니다. 각 workflow와 job은 `.env.example`, GitHub Actions secrets, repository variables를 채워서 사용합니다.
 
-Production 실행은 **GitHub Actions를 1순위**로 권장합니다. 정시성이 중요한 Slack/Invoice 작업은 외부 스케줄러가 GitHub `workflow_dispatch`를 호출하는 방식으로 실행합니다. 로컬 `launchd`와 Codex automation 예시는 2순위 백업/이관용이며, GitHub Actions가 active일 때는 중복 실행하지 않습니다.
+Production 실행은 **GitHub Actions를 1순위**로 권장합니다. Flex 휴가/결재 리마인더는 GitHub Actions 자체 schedule로 실행하고, 나머지 정시성이 중요한 Slack/Invoice 작업은 외부 스케줄러가 GitHub `workflow_dispatch`를 호출합니다. 로컬 `launchd`와 Codex automation 예시는 2순위 백업/이관용이며, GitHub Actions가 active일 때는 중복 실행하지 않습니다.
 
 ## 들어있는 자동화
 
@@ -29,7 +29,7 @@ Slack 알림 계열 작업에는 공통적으로 한국 주말, 법정 공휴일
 3. 토큰과 ID는 GitHub repository secrets/variables에 등록합니다.
 4. 모든 workflow는 먼저 `dry-run`으로 실행합니다.
 5. 실제 운영 시 `apply` 모드로 전환합니다.
-6. Slack 알림처럼 정시성이 중요한 workflow는 외부 스케줄러가 GitHub `workflow_dispatch` API를 호출하게 둡니다.
+6. Flex workflow는 저장소의 GitHub schedule을 사용하고, 다른 정시성 workflow는 외부 스케줄러가 GitHub `workflow_dispatch` API를 호출하게 둡니다.
 
 GitHub Actions를 우선하는 이유는 실행 기록, 실패 로그, state 커밋, secret 관리가 한 곳에 남기 때문입니다. 로컬 PC가 꺼져 있어도 실행됩니다.
 
@@ -113,7 +113,7 @@ npm run dry-run:channel-cleanup
 | Operations 문서 복사 | `jobs/operations-meeting-copy` | 월 12:00 KST | Notion 문서 생성 |
 | Team Weekly 회의록 복사/알림 | `jobs/team-weekly-meeting-copy` | 월 10:00 KST external dispatch | Notion 문서 생성, Slack 채널 메시지 |
 | team issue Slack 리마인더 | `jobs/issue-tracker-slack-reminder` | 월-금 10:00 KST external dispatch | Slack 채널 메시지, state 커밋 |
-| Flex 휴가/결재 리액션 리마인더 | `jobs/flex-reaction-reminder` | 월 15:00/18:00 KST external dispatch | Slack 스레드 메시지, state 커밋 |
+| Flex 휴가/결재 리액션 리마인더 | `jobs/flex-reaction-reminder` | 월 11:00/15:00/18:00 KST | Slack 원본/스레드 메시지, state 커밋 |
 | 월별 인보이스 요청 | `jobs/invoice-request` | 월-금 10:00/15:00/18:00 KST external dispatch | Slack 메시지, state 커밋 |
 | 인보이스 첨부파일 Drive 보관 | `jobs/invoice-attachment-archive` | 월-금 18:10 KST external dispatch | Google Drive 업로드, state 커밋 |
 | Slack 미사용 채널 정리 | `jobs/slack-channel-cleanup` | 매월 1일 14:00 KST external dispatch | Slack 공지/채널 아카이브, state 커밋 |
@@ -130,7 +130,7 @@ GitHub Actions cron은 UTC 기준입니다. 아래 표의 cron은 KST 실행 시
 | `notion-operations-meeting.yml` | `0 3 * * 1` | 월 12:00 |
 | `notion-team-weekly-meeting.yml` | external dispatch | 월 10:00 |
 | `slack-issue-reminder.yml` | external dispatch | 월-금 10:00 |
-| `slack-flex-reaction-reminder.yml` | external dispatch | 월 15:00/18:00 |
+| `slack-flex-reaction-reminder.yml` | `0 2 * * 1`, `0 6,9 * * 1` | 월 11:00/15:00/18:00 |
 | `slack-invoice-request.yml` | external dispatch | 월-금 10:00/15:00/18:00 |
 | `slack-invoice-attachment-archive.yml` | external dispatch | 월-금 18:10 |
 | `slack-channel-cleanup.yml` | external dispatch | 매월 1일 14:00 |
@@ -242,15 +242,15 @@ team issue 리마인더는 외부 스케줄러가 월-금 10:00 KST에 GitHub `w
 
 ### Flex 휴가/결재 리액션 리마인더 봇
 
-Flex 리마인더는 Slack Workflow Builder가 올린 `[Flex 승인 리마인드]` 메시지를 기준으로, 확인 리액션을 누르지 않은 사람만 스레드에서 다시 멘션합니다.
+Flex 리마인더는 GitHub Actions가 올린 `[Flex 승인 리마인드]` 메시지를 기준으로, 확인 리액션을 누르지 않은 사람만 스레드에서 다시 멘션합니다.
 
 동작 흐름:
 
-- 기준 요청 메시지는 매주 월요일 11:00 KST에 리드방에 올라오는 `[Flex 승인 리마인드]` 문구입니다.
-- Slack Workflow Builder의 원본 요청 메시지는 11:00 KST 1회만 발송되어야 합니다. 15:00/18:00에는 새 채널 메시지를 만들지 않습니다.
+- GitHub Actions가 매주 월요일 11:00 KST에 리드방에 `[Flex 승인 리마인드]` 원본을 한 번 생성합니다.
+- 같은 KST 날짜에 원본이 이미 있으면 재실행해도 중복 생성하지 않습니다. 15:00/18:00에는 새 채널 메시지를 만들지 않습니다.
 - 봇은 월요일 15:00 KST에 1차, 18:00 KST에 2차로 같은 채널을 확인합니다.
 - 원본 메시지가 몇 분 늦게 생성되거나 GitHub run이 몇 초 어긋나도 놓치지 않도록 첫 확인 기준은 180분, 리마인더 간격은 120분으로 둡니다.
-- 외부 스케줄러가 GitHub `workflow_dispatch`를 호출하는 방식으로 실행합니다.
+- 저장소의 GitHub Actions schedule이 11:00 원본 생성과 15:00/18:00 스레드 리마인드를 실행합니다.
 - 같은 날 `[Flex 승인 리마인드]` 원본이 여러 개 발견되면 가장 이른 원본만 기준으로 삼고, 이후 원본은 중복으로 보고 무시합니다.
 - `FLEX_TARGET_USER_IDS`에 등록된 리드 중 `:white_check_mark:` 리액션을 누르지 않은 사람을 찾습니다.
 - `FLEX_EXCLUDED_USER_IDS`에 등록된 퇴사/제외 계정은 항상 리마인더 대상에서 제외합니다.
