@@ -13,6 +13,11 @@ on:
         options:
           - dry-run
           - apply
+      force:
+        description: "Create even if the target date already exists"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -28,20 +33,21 @@ jobs:
     env:
       TZ: Asia/Seoul
       RUN_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'apply' }}
+      MEETING_FORCE_CREATE: ${{ github.event_name == 'workflow_dispatch' && inputs.force && '1' || '0' }}
       NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
       MEETINGS_DATABASE_ID: ${{ vars.OPERATIONS_MEETINGS_DATABASE_ID }}
       SLACK_FAILURE_WEBHOOK_URL: ${{ secrets.SLACK_FAILURE_WEBHOOK_URL }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
 
-      - name: Validate config
+      - name: Validate repository secret and variable
         run: npm run validate:config -- operations-meeting
 
       - name: Check meeting jobs

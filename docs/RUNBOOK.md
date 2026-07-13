@@ -30,6 +30,8 @@ GitHub Actions에서 각 workflow의 `Run workflow`를 사용합니다.
 
 실제 반영 전에는 `dry-run` 결과를 먼저 확인합니다. 문제가 없으면 같은 workflow를 `apply`로 다시 실행합니다.
 
+Operations 문서 복사에서 같은 날짜의 문서가 이미 있어도 다시 생성해야 하는 경우에만 `force`를 켭니다. `apply`와 `force`를 함께 선택하면 같은 날짜와 제목의 문서가 추가로 생성될 수 있으므로 장애 복구나 명시적인 재생성에만 사용합니다. 정기 실행에서는 `force`가 항상 꺼집니다.
+
 ## 로컬 드라이런
 
 ```bash
