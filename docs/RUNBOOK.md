@@ -18,7 +18,7 @@ GitHub Actions에서 각 workflow의 `Run workflow`를 사용합니다.
 
 | 작업 | workflow | 기본 mode |
 |---|---|---|
-| Weekly Ops Meeting 문서 복사 | `notion-weekly-meeting.yml` | `dry-run` |
+| 운영팀 주간미팅 문서 복사 | `notion-weekly-meeting.yml` | `dry-run` |
 | Operations 문서 복사 | `notion-operations-meeting.yml` | `dry-run` |
 | Team Weekly 회의록 복사/알림 | `notion-team-weekly-meeting.yml` | `dry-run` |
 | team issue 리마인더 | `slack-issue-reminder.yml` | `dry-run` |
@@ -29,6 +29,8 @@ GitHub Actions에서 각 workflow의 `Run workflow`를 사용합니다.
 | 공휴일 fallback 감사 | `korean-holiday-fallback-audit.yml` | 연도 입력 선택 |
 
 실제 반영 전에는 `dry-run` 결과를 먼저 확인합니다. 문제가 없으면 같은 workflow를 `apply`로 다시 실행합니다.
+
+운영팀 주간미팅을 다음 주 날짜로 미리 검증할 때는 `days_ahead=7`을 선택합니다. 정기 실행과 당일 수동 실행은 `days_ahead=0`입니다.
 
 Flex 수동 실행은 `task=source`가 원본 메시지 생성, `task=reminder`가 기존 원본 스레드의 미확인자 리마인드입니다. 기본값은 오발송 방지를 위해 `reminder`입니다.
 

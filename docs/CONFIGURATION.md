@@ -63,6 +63,16 @@ gh variable set OPERATIONS_MEETINGS_DATABASE_ID \
 
 등록 후 `Notion Operations meeting copy`를 먼저 `dry-run`으로 수동 실행해 integration 권한과 데이터베이스 ID를 확인합니다.
 
+운영팀 주간미팅 복사에는 다음 설정이 필요합니다.
+
+| GitHub 설정 | 종류 | 값 |
+|---|---|---|
+| `NOTION_TOKEN` | Repository secret | Operations 페이지와 Meetings 데이터베이스에 연결된 Notion integration token |
+| `WEEKLY_MEETINGS_DATABASE_ID` | Repository variable | `운영팀 주간미팅` 문서가 들어 있는 Meetings 데이터베이스 ID |
+| `OPERATIONS_WEEKLY_AGENDA_URL` | Repository variable | 새 회의록에 linked view로 삽입할 Operations 중앙 `아젠다` 데이터베이스 URL |
+
+정기 실행은 월요일 10:00 KST이며, 수동 검증 시 `days_ahead=7`을 사용하면 다음 주 문서를 대상으로 dry-run할 수 있습니다.
+
 Flex 휴가/결재 리마인더에는 다음 설정이 필요합니다.
 
 | GitHub 설정 | 종류 | 값 |
@@ -136,7 +146,7 @@ Notion integration이 아래 대상에 접근할 수 있어야 합니다.
 
 | 작업 | 필요한 접근 |
 |---|---|
-| Weekly Ops Meeting 문서 복사 | Operations 페이지의 Meetings 데이터베이스와 복사 대상 문서 |
+| 운영팀 주간미팅 문서 복사 | Operations 페이지의 Meetings 데이터베이스, 복사 대상 문서, 중앙 `아젠다` 데이터베이스 |
 | Operations 문서 복사 | Meeting Notes 데이터베이스와 Operations 문서 |
 | Team Weekly 회의록 복사 | Meeting Notes 데이터베이스와 `Team Weekly` 문서 |
 | team issue 리마인더 | Issue Tracker 하위 team issue tracker |
@@ -157,7 +167,7 @@ Notion integration이 아래 대상에 접근할 수 있어야 합니다.
 | `MEETING_CHILD_DATABASE_REFERENCE_APPEND_IF_MISSING` | `0` | `1`이면 원본에 skip 대상 child DB가 없어도 중앙 DB reference를 삽입합니다. |
 | `MEETING_CHILD_DATABASE_REFERENCE_MISSING_TITLE` | `MEETING_CHILD_DATABASE_REFERENCE_TEXT` | missing reference를 삽입할 때 사용할 섹션/view 이름입니다. |
 | `MEETING_CHILD_DATABASE_WRAP_CELLS` | `1` | child database를 새로 복제하거나 linked table view를 만들 때 cell wrap을 켭니다. `0`이면 비활성화합니다. |
-| `OPERATIONS_WEEKLY_AGENDA_URL` | 빈 값 | Weekly Meeting 아젠다 중앙 DB URL입니다. 필요한 경우 repository variable로 등록합니다. |
+| `OPERATIONS_WEEKLY_AGENDA_URL` | 빈 값 | 운영팀 주간미팅 아젠다 중앙 DB URL입니다. GitHub 운영 시 repository variable로 등록합니다. |
 | `TEAM_SHARED_SCHEDULE_URL` | 빈 값 | Team schedule/time-off 중앙 DB URL입니다. 필요한 경우 repository variable로 등록합니다. |
 
 GitHub Actions에서는 위 URL 값들을 secret이 아니라 repository variable로 등록해도 됩니다. 경로는 `Settings > Secrets and variables > Actions > Variables`입니다.
@@ -166,7 +176,7 @@ GitHub Actions에서는 위 URL 값들을 secret이 아니라 repository variabl
 
 | 작업 | child database row 처리 |
 |---|---|
-| Weekly Ops Meeting 문서 복사 | `아젠다` child DB는 복사하지 않고 Operations 중앙 아젠다 DB를 table linked database view로 삽입 |
+| 운영팀 주간미팅 문서 복사 | `아젠다` child DB는 복사하지 않고 Operations 중앙 아젠다 DB를 table linked database view로 삽입 |
 | Operations 문서 복사 | `Decision`, `Tracking` child DB는 기존 동작대로 복사 |
 | Team Weekly 회의록 복사 | child DB는 복사하지 않고 `TEAM_SHARED_SCHEDULE_URL`을 calendar linked database view로 삽입 |
 

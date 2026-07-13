@@ -54,6 +54,16 @@ test("meeting target date and title are derived in Asia/Seoul", () => {
   });
 });
 
+test("weekly operations meeting target uses the production Korean title", () => {
+  assert.deepEqual(
+    buildMeetingTarget({ targetDate: "2026-07-20", titleSuffix: "운영팀 주간미팅" }),
+    {
+      targetDate: "2026-07-20",
+      targetTitle: "2026-07-20 운영팀 주간미팅",
+    },
+  );
+});
+
 test("source meeting title and date are replaced in copied rich text content", () => {
   assert.equal(
     replaceMeetingText("2026-04-28 Operations / 2026-04-28", {
@@ -174,6 +184,7 @@ test("child database reference resolves title-specific and fallback links", () =
 
 test("child database references can use a section title when the source view is untitled", () => {
   assert.equal(childDatabaseDisplayTitle("Untitled", "휴가 공유"), "휴가 공유");
+  assert.equal(childDatabaseDisplayTitle("Untitled", "아젠다"), "아젠다");
   assert.equal(childDatabaseDisplayTitle("Agenda", "휴가 공유"), "Agenda");
 });
 

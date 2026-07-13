@@ -109,7 +109,7 @@ npm run dry-run:channel-cleanup
 
 | 작업 | 폴더 | 기본 실행 | 주요 side effect |
 |---|---|---:|---|
-| Weekly Ops Meeting 문서 복사 | `jobs/weekly-meeting-copy` | 월 10:00 KST | Notion 문서 생성 |
+| 운영팀 주간미팅 문서 복사 | `jobs/weekly-meeting-copy` | 월 10:00 KST | Notion 문서 생성 |
 | Operations 문서 복사 | `jobs/operations-meeting-copy` | 월 12:00 KST | Notion 문서 생성 |
 | Team Weekly 회의록 복사/알림 | `jobs/team-weekly-meeting-copy` | 월 10:00 KST external dispatch | Notion 문서 생성, Slack 채널 메시지 |
 | team issue Slack 리마인더 | `jobs/issue-tracker-slack-reminder` | 월-금 10:00 KST external dispatch | Slack 채널 메시지, state 커밋 |
@@ -179,16 +179,16 @@ Slack/Invoice 작업은 중복 발송을 막기 위해 `state/*.json`에 실행 
 
 Slack 알림을 보내는 자동화는 실행일이 한국 주말, 법정 공휴일, 대체공휴일이면 알림을 보내지 않도록 구성되어 있습니다. Google 한국 공휴일 캘린더를 우선 조회하고, 조회 실패 시 `lib/korean-holiday-fallbacks.mjs`의 static fallback을 사용합니다. 이 로직은 별도 알림 봇이 아니라 Slack 알림 job 위에 공통으로 덧씌우는 안전장치입니다.
 
-### Weekly Ops Meeting 문서 복사 봇
+### 운영팀 주간미팅 문서 복사 봇
 
-Weekly Ops Meeting 봇은 매주 월요일 10:00 KST에 Operations 페이지의 Meetings 데이터베이스를 보고, 당일 날짜의 `Weekly Ops Meeting` 문서가 없으면 직전 주 미팅 문서를 새 날짜로 복사합니다.
+운영팀 주간미팅 봇은 매주 월요일 10:00 KST에 Operations 페이지의 Meetings 데이터베이스를 보고, 당일 날짜의 `운영팀 주간미팅` 문서가 없으면 직전 주 미팅 문서를 새 날짜로 복사합니다.
 
 동작 흐름:
 
 - 타깃 날짜는 실행일 당일입니다.
 - 타깃 날짜 문서가 이미 있으면 아무것도 만들지 않습니다.
 - 타깃 날짜가 대한민국 법정 공휴일 또는 대체공휴일이면 생성하지 않습니다.
-- 복사 원본은 `Date` 기준으로 타깃 날짜보다 이전인 최신 `Weekly Ops Meeting` 문서입니다.
+- 복사 원본은 `Date` 기준으로 타깃 날짜보다 이전인 최신 `운영팀 주간미팅` 문서입니다.
 - 복사된 문서 제목과 본문/하위 DB row title 안의 기존 날짜는 target date 기준으로 바꿉니다.
 - `온도 체크` 섹션은 사람별 멘션만 남기고, 각 멘션 아래 코멘트 영역은 빈칸으로 초기화합니다.
 - 하위 `아젠다` DB는 새 회의록에 복제하지 않고, Operations 상위 문서의 중앙 아젠다 DB를 cell wrap이 켜진 table linked database view로 삽입합니다.

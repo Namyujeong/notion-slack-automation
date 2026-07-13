@@ -13,6 +13,11 @@ on:
         options:
           - dry-run
           - apply
+      days_ahead:
+        description: "Target date offset (0 for this week, 7 for next week verification)"
+        required: true
+        default: "0"
+        type: string
 
 permissions:
   contents: read
@@ -28,6 +33,7 @@ jobs:
     env:
       TZ: Asia/Seoul
       RUN_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'apply' }}
+      MEETING_TARGET_DAYS_AHEAD: ${{ github.event_name == 'workflow_dispatch' && inputs.days_ahead || '0' }}
       NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
       MEETINGS_DATABASE_ID: ${{ vars.WEEKLY_MEETINGS_DATABASE_ID }}
       OPERATIONS_WEEKLY_AGENDA_URL: ${{ vars.OPERATIONS_WEEKLY_AGENDA_URL }}
