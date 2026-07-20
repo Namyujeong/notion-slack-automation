@@ -1,0 +1,11 @@
+version = 1
+id = "slack-flex"
+kind = "cron"
+name = "Slack Flex 휴가 및 결재 리액션 리마인더"
+prompt = "This is a paused configuration example. Before enabling it in a private deployment environment, configure test credentials, run the job in dry-run mode, and verify that no other scheduler runs the same reminder."
+status = "PAUSED"
+rrule = "FREQ=WEEKLY;BYDAY=MO;BYHOUR=15,18;BYMINUTE=0;BYSECOND=0"
+model = "gpt-5.3-codex"
+reasoning_effort = "low"
+execution_environment = "local"
+cwds = ["/path/to/notion-slack-automation"]

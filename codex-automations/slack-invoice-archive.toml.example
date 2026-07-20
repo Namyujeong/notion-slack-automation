@@ -1,0 +1,11 @@
+version = 1
+id = "slack-invoice-archive"
+kind = "cron"
+name = "Slack 인보이스 첨부파일 Drive 보관"
+prompt = "This automation is paused because the reliable production path is the local launchd job `com.example.invoice-attachment-archive`, which runs `node jobs/invoice-attachment-archive/index.mjs --apply` on weekdays at 18:10 KST with normal local network access. The script scans invoice request threads from local state, uploads newly attached files to Google Drive, and updates a monthly status markdown file. Keep this record for visibility only; do not run it while launchd is active to avoid duplicate archive runs."
+status = "PAUSED"
+rrule = "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;BYHOUR=18;BYMINUTE=10;BYSECOND=0"
+model = "gpt-5.3-codex"
+reasoning_effort = "low"
+execution_environment = "local"
+cwds = ["/path/to/notion-slack-automation"]

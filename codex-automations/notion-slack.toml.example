@@ -1,0 +1,11 @@
+version = 1
+id = "notion-slack"
+kind = "cron"
+name = "Notion team issues Slack 리마인더"
+prompt = "This automation is paused because the reliable production path is the local launchd job `com.example.notion-due-reminder`, which runs `node jobs/issue-tracker-slack-reminder/index.mjs --apply` on weekdays at 10:00 KST with normal local network access. Keep this record for visibility only; do not run it while launchd is active to avoid duplicate Slack reminders."
+status = "PAUSED"
+rrule = "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;BYHOUR=10;BYMINUTE=0;BYSECOND=0"
+model = "gpt-5.3-codex"
+reasoning_effort = "low"
+execution_environment = "local"
+cwds = ["/path/to/notion-slack-automation"]

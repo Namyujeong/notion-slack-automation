@@ -1,0 +1,43 @@
+# Copy this file into .github/workflows/ only in a private deployment repository.
+name: Example Notion weekly meeting copy
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Run mode
+        required: true
+        default: dry-run
+        type: choice
+        options:
+          - dry-run
+          - apply
+
+permissions:
+  contents: read
+
+concurrency:
+  group: example-notion-weekly-meeting
+  cancel-in-progress: false
+
+jobs:
+  copy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+      MEETINGS_DATABASE_ID: ${{ vars.MEETINGS_DATABASE_ID }}
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+      - run: npm run check:meeting
+      - name: Run example job
+        run: |
+          if [ "${{ inputs.mode }}" = "apply" ]; then
+            npm run run:weekly
+          else
+            npm run dry-run:weekly
+          fi

@@ -1,0 +1,19 @@
+{
+  "targets": [
+    {
+      "name": "Kevin",
+      "slackUserId": "U0123456789",
+      "services": [
+        "Example SaaS",
+        "Example Cloud"
+      ],
+      "active": true
+    },
+    {
+      "name": "yujeong",
+      "slackUserId": "U0987654321",
+      "services": [],
+      "active": true
+    }
+  ]
+}
